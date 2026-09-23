@@ -165,6 +165,8 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
 
 STATIC_URL = 'static/'
+# Requis par collectstatic en prod (ex. STATIC_ROOT=/var/www/qr/staticfiles).
+STATIC_ROOT = os.environ.get('STATIC_ROOT', str(BASE_DIR / 'staticfiles'))
 
 # QR Tracker — comptage des scans (QR dynamiques).
 # SHORT_BASE_URL doit être le domaine public pérenne en production,
