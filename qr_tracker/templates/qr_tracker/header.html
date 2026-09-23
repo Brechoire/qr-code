@@ -1,0 +1,10 @@
+<header class="bg-gradient-to-r from-[var(--primary-color)] to-[var(--secondary-color)] text-white shadow-md">
+<div class="max-w-[1040px] mx-auto px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-2">
+<a class="font-bold text-lg text-white no-underline" href="/">QR codes — Sud-Avesnois</a>
+<nav aria-label="Navigation principale" class="flex gap-1">
+<a href="/" class="text-white/85 no-underline px-3 py-1.5 rounded-lg hover:bg-white/15 hover:text-white {% if request.path == "/" %}bg-white/25 text-white font-bold{% endif %}" {% if request.path == "/" %}aria-current="page"{% endif %}>Générateur</a>
+<a href="/stats/" class="text-white/85 no-underline px-3 py-1.5 rounded-lg hover:bg-white/15 hover:text-white {% if request.path|slice:":7" == "/stats/" %}bg-white/25 text-white font-bold{% endif %}" {% if request.path|slice:":7" == "/stats/" %}aria-current="page"{% endif %}>Stats</a>
+<a href="/categories/" class="text-white/85 no-underline px-3 py-1.5 rounded-lg hover:bg-white/15 hover:text-white {% if request.path == "/categories/" %}bg-white/25 text-white font-bold{% endif %}" {% if request.path == "/categories/" %}aria-current="page"{% endif %}>Catégories</a>
+</nav>
+</div>
+</header>

@@ -1,0 +1,288 @@
+{% extends "qr_tracker/base.html" %}
+{% load qr_extras %}
+{% block title %}{{ link.display_title }} — Stats QR{% endblock %}
+{% block content %}
+<p class="text-sm my-1"><a href="/stats/">← Tous les QR</a></p>
+<section class="bg-white border border-[var(--border-color)] rounded-xl shadow-sm p-6 grid gap-6 md:grid-cols-[250px_1fr] items-start" aria-label="Résumé du QR">
+<img src="/qr/{{ link.short_id }}/img/" alt="QR code vers {{ link.display_title }}" width="250" height="250" class="w-full max-w-[250px] h-auto aspect-square border border-gray-100 rounded-[10px] bg-white">
+<div class="min-w-0">
+<h1 class="text-2xl m-0 mb-1 break-words">{{ link.display_title }}</h1>
+<p><span class="inline-flex items-center bg-[#e6f2ff] text-[var(--primary-color)] rounded-full px-3 py-1 font-semibold text-sm">{{ link.scan_count }} scan{{ link.scan_count|pluralize }}</span>
+{% if link.category %}<span class="inline-flex items-center border rounded-full px-3 py-1 text-xs font-semibold" style="{{ link.category.name|cat_style }}">{{ link.category.name }}</span>{% endif %}
+<span class="text-sm text-[var(--text-light)]">{{ link.get_kind_display }} · créé le {{ link.created_at|date:"d/m/Y" }}</span></p>
+<div class="flex flex-wrap gap-2 my-3" aria-label="Chiffres clés">
+<div class="bg-[var(--bg-light)] rounded-[10px] px-4 py-2 min-w-[7rem]"><div class="text-xl font-bold text-[var(--primary-color)]">{{ link.scan_count }}</div><div class="text-xs text-[var(--text-light)]">Total</div></div>
+<div class="bg-[var(--bg-light)] rounded-[10px] px-4 py-2 min-w-[7rem]"><div class="text-xl font-bold text-[var(--primary-color)]">{{ peak }}</div><div class="text-xs text-[var(--text-light)]">Pic / jour</div></div>
+<div class="bg-[var(--bg-light)] rounded-[10px] px-4 py-2 min-w-[7rem]"><div class="text-xl font-bold text-[var(--primary-color)]">{{ moyenne }}</div><div class="text-xs text-[var(--text-light)]">Moyenne / jour actif</div></div>
+<div class="bg-[var(--bg-light)] rounded-[10px] px-4 py-2 min-w-[7rem]"><div class="text-xl font-bold text-[var(--primary-color)]">{{ scans_7j }}</div><div class="text-xs text-[var(--text-light)]">7 derniers jours</div></div>
+</div>
+<form id="goalForm" class="flex flex-wrap gap-2 items-center my-2" aria-label="Objectif de scans">
+<label for="goalInput" class="text-sm font-medium">Objectif :</label>
+<input type="number" id="goalInput" name="goal" min="0" max="1000000" step="1" value="{{ link.goal }}" class="px-3 py-2 border border-gray-300 rounded-lg text-sm w-28">
+<button class="inline-flex items-center px-4 py-2 rounded-lg bg-[var(--primary-color)] text-white font-semibold text-sm hover:bg-[var(--secondary-color)]" type="submit">Enregistrer</button>
+<span id="goalStatus" role="status" aria-live="polite" class="text-sm text-[var(--text-light)]"></span>
+</form>
+{% if goal_pct is not None %}
+<div role="img" aria-label="Objectif atteint à {{ goal_pct }} pour cent ({{ link.scan_count }} sur {{ link.goal }})">
+<div class="h-2.5 rounded-full bg-[#eef2f6] mt-1"><div class="h-2.5 rounded-full bg-[var(--primary-color)]" style="width:{{ goal_pct }}%"></div></div>
+<p class="text-sm text-[var(--text-light)] my-1">{{ link.scan_count }} / {{ link.goal }} scans ({{ goal_pct }} %)</p>
+</div>
+{% endif %}
+<p class="break-all">Cible : <a href="{{ link.display_content }}">{{ link.display_content }}</a></p>
+<p class="text-sm text-[var(--text-light)]">Court : <a href="/r/{{ link.short_id }}/">/r/{{ link.short_id }}/</a> · Dernier scan : {% if link.last_scanned_at %}il y a {{ link.last_scanned_at|timesince }}{% else %}—{% endif %}</p>
+<form id="catForm" class="flex flex-wrap gap-2 items-center my-2" aria-label="Catégorie du QR">
+<label for="catInput" class="text-sm font-medium">Catégorie :</label>
+<span class="combo-wrap relative inline-block">
+<input type="text" id="catInput" name="category" value="{{ link.category.name|default:'' }}" maxlength="60" placeholder="Sans catégorie" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="catPopup" aria-autocomplete="list" class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+<button type="button" id="catToggle" class="border-0 bg-transparent text-[var(--primary-color)] text-[15px] cursor-pointer px-1" aria-label="Afficher les catégories" aria-expanded="false" aria-controls="catPopup">▾</button>
+<ul id="catPopup" role="listbox" aria-label="Catégories existantes" class="absolute left-0 top-[calc(100%+4px)] z-30 min-w-[230px] max-h-[220px] overflow-y-auto m-0 p-1 list-none bg-white border border-[var(--border-color)] rounded-lg shadow-lg" hidden></ul>
+</span>
+<button class="inline-flex items-center px-4 py-2 rounded-lg bg-[var(--primary-color)] text-white font-semibold text-sm hover:bg-[var(--secondary-color)]" type="submit">Enregistrer</button>
+<span id="catStatus" role="status" aria-live="polite" class="text-sm text-[var(--text-light)]"></span>
+</form>
+<div class="flex flex-wrap gap-2 mt-2">
+<a class="inline-flex items-center border border-[var(--border-color)] rounded-lg px-3 py-1.5 text-sm" href="/qr/{{ link.short_id }}/img/" download="qr-{{ link.short_id }}.png">Télécharger le QR (PNG)</a>
+<button type="button" class="inline-flex items-center border border-[var(--border-color)] rounded-lg px-3 py-1.5 text-sm bg-white cursor-pointer" data-copy="/r/{{ link.short_id }}/">Copier le court</button>
+<button type="button" class="inline-flex items-center border border-[var(--border-color)] rounded-lg px-3 py-1.5 text-sm bg-white cursor-pointer" data-copy="{{ link.display_content }}">Copier la cible</button>
+</div>
+<p class="sr-only" role="status" aria-live="polite" id="copyStatus"></p>
+</div>
+</section>
+<section class="bg-white border border-[var(--border-color)] rounded-xl shadow-sm p-6 mt-4" aria-label="Scans des 30 derniers jours">
+<h2 class="m-0 mb-3 text-lg">Scans — 30 derniers jours</h2>
+{% if per_day %}
+<div class="relative h-56"><canvas id="monthChart" aria-label="Histogramme des scans par jour sur 30 jours"></canvas></div>
+<p class="text-sm text-[var(--text-light)] chart-fallback" hidden>Graphique indisponible hors ligne — voir le tableau ci-dessous.</p>
+<table class="w-full border-collapse">
+<thead><tr><th scope="col" class="text-left py-1.5 border-b border-[var(--border-color)]">Jour</th><th scope="col" class="text-right py-1.5 border-b border-[var(--border-color)]">Scans</th></tr></thead>
+<tbody>
+{% for row in per_day %}
+<tr><td class="py-1.5 border-b border-[var(--border-color)]">{{ row.day|date:"d/m/Y" }}</td><td class="py-1.5 border-b border-[var(--border-color)] text-right tabular-nums">{{ row.count }}</td></tr>
+{% endfor %}
+</tbody>
+</table>
+{% else %}
+<p class="text-sm text-[var(--text-light)]">Aucun scan pour le moment.</p>
+{% endif %}
+{{ month_labels|json_script:"month-labels" }}
+{{ month_values|json_script:"month-values" }}
+</section>
+<section class="bg-white border border-[var(--border-color)] rounded-xl shadow-sm p-6 mt-4" aria-label="Derniers scans">
+<h2 class="m-0 mb-3 text-lg">Derniers scans</h2>
+{% if recents %}
+<ul class="list-none m-2 p-0">
+{% for scan in recents %}
+<li class="relative pl-6 py-1.5 ml-1.5 border-l-2 border-[var(--border-color)] before:content-[''] before:absolute before:-left-[7px] before:top-3 before:w-2.5 before:h-2.5 before:rounded-full before:bg-[var(--accent-color)]">il y a {{ scan.scanned_at|timesince }} <span class="text-sm text-[var(--text-light)]">({{ scan.scanned_at|date:"d/m/Y H:i" }})</span></li>
+{% endfor %}
+</ul>
+{% else %}
+<p class="text-sm text-[var(--text-light)]">Aucun scan enregistré.</p>
+{% endif %}
+</section>
+<section class="bg-white border border-[var(--border-color)] rounded-xl shadow-sm p-6 mt-4" aria-label="Appareils">
+<h2 class="m-0 mb-1 text-lg">Appareils <span class="text-sm font-normal text-[var(--text-light)]">(estimation via navigateur)</span></h2>
+<div class="grid gap-4 md:grid-cols-2 items-center">
+<div class="relative h-48"><canvas id="deviceChart" aria-label="Répartition des scans par appareil"></canvas></div>
+<table class="w-full border-collapse">
+<thead><tr><th scope="col" class="text-left py-1.5 border-b border-[var(--border-color)]">Appareil</th><th scope="col" class="text-right py-1.5 border-b border-[var(--border-color)]">Scans</th></tr></thead>
+<tbody>
+<tr><td class="py-1.5 border-b border-[var(--border-color)]">Mobile</td><td class="py-1.5 border-b border-[var(--border-color)] text-right tabular-nums">{{ devices.mobile }}</td></tr>
+<tr><td class="py-1.5 border-b border-[var(--border-color)]">Tablette</td><td class="py-1.5 border-b border-[var(--border-color)] text-right tabular-nums">{{ devices.tablette }}</td></tr>
+<tr><td class="py-1.5 border-b border-[var(--border-color)]">Ordinateur</td><td class="py-1.5 border-b border-[var(--border-color)] text-right tabular-nums">{{ devices.desktop }}</td></tr>
+<tr><td class="py-1.5 border-b border-[var(--border-color)]">Autre</td><td class="py-1.5 border-b border-[var(--border-color)] text-right tabular-nums">{{ devices.autre }}</td></tr>
+</tbody>
+</table>
+</div>
+{{ devices|json_script:"device-data" }}
+</section>
+<section class="bg-white border border-[var(--border-color)] rounded-xl shadow-sm p-6 mt-4" aria-label="Annotations">
+<h2 class="m-0 mb-3 text-lg">Annotations</h2>
+<ul id="notesList" class="list-none m-0 mb-3 p-0">
+{% for note in notes %}
+<li class="py-1.5 border-b border-[var(--border-color)] flex justify-between gap-2 text-sm" data-note-id="{{ note.id }}"><span>{{ note.text }} <span class="text-[var(--text-light)] text-xs">({{ note.created_at|date:"d/m/Y H:i" }})</span></span><button type="button" class="text-red-700 text-sm" data-note-del="{{ note.id }}" aria-label="Supprimer cette annotation">Supprimer</button></li>
+{% empty %}
+<li class="text-sm text-[var(--text-light)]" id="notesEmpty">Aucune annotation.</li>
+{% endfor %}
+</ul>
+<form id="noteForm" class="flex gap-2 items-center flex-wrap" aria-label="Ajouter une annotation">
+<label class="sr-only" for="noteInput">Nouvelle annotation</label>
+<input type="text" id="noteInput" maxlength="280" placeholder="Ex : flyer distribué le…" autocomplete="off" class="flex-1 min-w-[200px] px-3 py-2 border border-gray-300 rounded-lg text-sm">
+<button class="inline-flex items-center px-4 py-2 rounded-lg bg-[var(--primary-color)] text-white font-semibold text-sm hover:bg-[var(--secondary-color)]" type="submit">Ajouter</button>
+<span id="noteStatus" role="status" aria-live="polite" class="text-sm text-[var(--text-light)]"></span>
+</form>
+</section>
+{% endblock %}
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" defer></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  if (typeof window.Chart !== 'undefined') {
+    var ml = document.getElementById('month-labels');
+    var mv = document.getElementById('month-values');
+    var mc = document.getElementById('monthChart');
+    if (ml && mv && mc) {
+      new window.Chart(mc, {
+        type: 'bar',
+        data: { labels: JSON.parse(ml.textContent), datasets: [{ data: JSON.parse(mv.textContent), backgroundColor: '#6b9bd1', borderRadius: 3 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+      });
+    }
+    var dd = document.getElementById('device-data');
+    var dc = document.getElementById('deviceChart');
+    if (dd && dc) {
+      var dev = JSON.parse(dd.textContent);
+      new window.Chart(dc, {
+        type: 'doughnut',
+        data: { labels: ['Mobile', 'Tablette', 'Ordinateur', 'Autre'], datasets: [{ data: [dev.mobile, dev.tablette, dev.desktop, dev.autre], backgroundColor: ['#2c5f8d', '#6b9bd1', '#9fc1e3', '#dbe4ec'] }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+      });
+    }
+  } else {
+    document.querySelectorAll('.chart-fallback').forEach(function (p) { p.hidden = false; });
+  }
+});
+(function () {
+  var input = document.getElementById('catInput');
+  var toggle = document.getElementById('catToggle');
+  var popup = document.getElementById('catPopup');
+  var cache = [];
+  var rows = [];
+  var active = -1;
+  var open = false;
+  function norm(s) { return (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
+  function setExpanded(v) {
+    input.setAttribute('aria-expanded', v ? 'true' : 'false');
+    toggle.setAttribute('aria-expanded', v ? 'true' : 'false');
+  }
+  function close() { popup.hidden = true; open = false; active = -1; setExpanded(false); }
+  function render() {
+    var typed = input.value.trim();
+    var f = norm(typed);
+    var matches = cache.filter(function (c) { return !f || norm(c.name).indexOf(f) !== -1; });
+    rows = matches.map(function (c) { return { kind: 'opt', name: c.name, count: c.links_count }; });
+    popup.innerHTML = '';
+    if (!cache.length) rows = [{ kind: 'info', name: 'Aucune catégorie — saisie libre.' }];
+    active = -1;
+    rows.forEach(function (row, idx) {
+      var li = document.createElement('li');
+      li.setAttribute('role', 'option');
+      li.setAttribute('aria-selected', 'false');
+      li.className = 'px-2.5 py-2 rounded-md cursor-pointer text-sm flex justify-between gap-2 hover:bg-[#e6f2ff]';
+      if (row.kind === 'opt') {
+        var label = document.createElement('span'); label.textContent = row.name;
+        var count = document.createElement('span'); count.className = 'text-xs text-[var(--text-light)] whitespace-nowrap'; count.textContent = row.count + ' QR';
+        li.appendChild(label); li.appendChild(count);
+        li.addEventListener('mousedown', function (e) { e.preventDefault(); input.value = row.name; close(); input.focus(); });
+      } else {
+        li.classList.add('text-[var(--text-light)]');
+        li.style.cursor = 'default';
+        li.textContent = row.name;
+      }
+      li.addEventListener('mouseenter', function () { highlight(idx); });
+      popup.appendChild(li);
+    });
+  }
+  function highlight(idx) {
+    active = idx;
+    Array.prototype.forEach.call(popup.children, function (li, i) {
+      if (i === idx) li.classList.add('bg-[#e6f2ff]');
+      else li.classList.remove('bg-[#e6f2ff]');
+      li.setAttribute('aria-selected', i === idx ? 'true' : 'false');
+    });
+  }
+  function openPopup() { render(); popup.hidden = false; open = true; setExpanded(true); }
+  input.addEventListener('focus', openPopup);
+  input.addEventListener('input', function () { if (!open) openPopup(); else render(); });
+  toggle.addEventListener('click', function () { if (open) { close(); input.focus(); } else { input.focus(); openPopup(); } });
+  input.addEventListener('keydown', function (e) {
+    var sel = rows.map(function (r, i) { return { r: r, i: i }; }).filter(function (x) { return x.r.kind === 'opt'; });
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!open) { openPopup(); return; }
+      if (!sel.length) return;
+      var pos = sel.findIndex(function (x) { return x.i === active; });
+      pos = e.key === 'ArrowDown' ? (pos + 1) % sel.length : (pos - 1 + sel.length) % sel.length;
+      highlight(sel[pos].i);
+    } else if (e.key === 'Enter') {
+      if (open && active >= 0 && rows[active] && rows[active].kind === 'opt') {
+        e.preventDefault();
+        input.value = rows[active].name; close();
+      }
+    } else if (e.key === 'Escape') {
+      if (open) { e.preventDefault(); close(); }
+    }
+  });
+  document.addEventListener('click', function (e) {
+    if (open && !e.target.closest('.combo-wrap')) close();
+  });
+  fetch('/api/categories/').then(function (r) { return r.json(); }).then(function (cats) {
+    cache = cats || [];
+  }).catch(function () {});
+  document.getElementById('catForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var st = document.getElementById('catStatus');
+    st.textContent = 'Enregistrement…';
+    fetch('/api/links/{{ link.short_id }}/patch/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category: document.getElementById('catInput').value })
+    }).then(function (r) { return r.json().then(function (b) { return { ok: r.ok, b: b }; }); }).then(function (res) {
+      st.textContent = res.ok ? 'Catégorie enregistrée.' : (res.b.error || 'Erreur.');
+    }).catch(function () { st.textContent = 'Serveur injoignable.'; });
+  });
+  document.querySelectorAll('[data-copy]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var done = function (ok) {
+        var s = document.getElementById('copyStatus');
+        if (s) s.textContent = ok === false ? 'Copie impossible.' : 'Copié !';
+      };
+      var val = btn.getAttribute('data-copy');
+      if (navigator.clipboard) navigator.clipboard.writeText(val).then(function(){done(true);}, function(){done(false);});
+      else {
+        var ta = document.createElement('textarea');
+        ta.value = val;
+        document.body.appendChild(ta); ta.select();
+        try { done(document.execCommand('copy')); } catch (e) { done(false); }
+        document.body.removeChild(ta);
+      }
+    });
+  });
+  document.getElementById('goalForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var st = document.getElementById('goalStatus');
+    st.textContent = 'Enregistrement…';
+    fetch('/api/links/{{ link.short_id }}/patch/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ goal: document.getElementById('goalInput').value })
+    }).then(function (r) { return r.json().then(function (b) { return { ok: r.ok, b: b }; }); }).then(function (res) {
+      if (res.ok) { st.textContent = 'Objectif enregistré.'; location.reload(); }
+      else st.textContent = res.b.error || 'Erreur.';
+    }).catch(function () { st.textContent = 'Serveur injoignable.'; });
+  });
+  function wireDel(scope) {
+    scope.querySelectorAll('[data-note-del]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        if (!confirm('Supprimer cette annotation ?')) return;
+        fetch('/api/notes/' + btn.getAttribute('data-note-del') + '/', { method: 'DELETE' }).then(function () { location.reload(); });
+      });
+    });
+  }
+  wireDel(document);
+  document.getElementById('noteForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var input = document.getElementById('noteInput');
+    var st = document.getElementById('noteStatus');
+    st.textContent = 'Enregistrement…';
+    fetch('/api/links/{{ link.short_id }}/notes/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: input.value })
+    }).then(function (r) { return r.json().then(function (b) { return { ok: r.ok, b: b }; }); }).then(function (res) {
+      if (res.ok) { location.reload(); }
+      else st.textContent = res.b.error || 'Erreur.';
+    }).catch(function () { st.textContent = 'Serveur injoignable.'; });
+  });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Stats QR — Sud-Avesnois{% endblock %}</title>
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<style>
+:root{
+  --primary-color:#2c5f8d; --secondary-color:#4a7ba7; --accent-color:#6b9bd1;
+  --text-dark:#2c3e50; --text-light:#5a6c7d; --bg-light:#f5f7fa; --border-color:#e1e8ed;
+}
+:focus-visible{outline:3px solid var(--accent-color);outline-offset:2px;border-radius:4px}
+.skip-link{position:absolute;left:-9999px;top:0;background:#fff;color:var(--primary-color);padding:.6rem 1rem;z-index:100;border-radius:0 0 8px 0;font-weight:600}
+.skip-link:focus{left:0}
+</style>
+{% block extra_head %}{% endblock %}
+</head>
+<body class="bg-[var(--bg-light)] text-[var(--text-dark)] font-sans antialiased">
+<a class="skip-link" href="#contenu">Aller au contenu</a>
+{% include "qr_tracker/header.html" %}
+<main id="contenu" class="max-w-[1040px] mx-auto px-4 pb-12">
+{% block content %}{% endblock %}
+</main>
+<p class="max-w-[1040px] mx-auto px-4 mt-8 text-sm text-[var(--text-light)]">Compté 1 fois par heure et par visiteur, robots exclus. Les QR statiques (texte, WiFi…) n'apparaissent pas ici.</p>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

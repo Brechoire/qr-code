@@ -1,0 +1,181 @@
+{% extends "qr_tracker/base.html" %}
+{% load qr_extras %}
+{% block title %}Stats QR — Sud-Avesnois{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold my-4">Statistiques des QR codes</h1>
+
+<section class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-5" aria-label="Synthèse">
+<div class="bg-white border border-[var(--border-color)] rounded-xl shadow-sm p-4 flex gap-3 items-start">
+<div class="text-2xl leading-none w-10 h-10 flex items-center justify-center bg-[#e6f2ff] rounded-[10px]" aria-hidden="true">▦</div>
+<div><div class="text-2xl font-bold text-[var(--primary-color)] leading-tight">{{ total_qr }}</div><div class="text-sm text-[var(--text-light)]">QR codes suivis</div></div>
+</div>
+<div class="bg-white border border-[var(--border-color)] rounded-xl shadow-sm p-4 flex gap-3 items-start">
+<div class="text-2xl leading-none w-10 h-10 flex items-center justify-center bg-[#e6f2ff] rounded-[10px]" aria-hidden="true">◉</div>
+<div><div class="text-2xl font-bold text-[var(--primary-color)] leading-tight">{{ total_scans }}</div><div class="text-sm text-[var(--text-light)]">Scans au total</div><div class="text-xs text-[var(--text-light)]">1 fois/heure/visiteur</div></div>
+</div>
+<div class="bg-white border border-[var(--border-color)] rounded-xl shadow-sm p-4 flex gap-3 items-start">
+<div class="text-2xl leading-none w-10 h-10 flex items-center justify-center bg-[#e6f2ff] rounded-[10px]" aria-hidden="true">↗</div>
+<div><div class="text-2xl font-bold text-[var(--primary-color)] leading-tight">{{ scans_7j }}</div><div class="text-sm text-[var(--text-light)]">Scans · 7 derniers jours</div></div>
+</div>
+<div class="bg-white border border-[var(--border-color)] rounded-xl shadow-sm p-4 flex gap-3 items-start">
+<div class="text-2xl leading-none w-10 h-10 flex items-center justify-center bg-[#e6f2ff] rounded-[10px]" aria-hidden="true">★</div>
+<div><div class="text-lg font-bold leading-tight">{% if top %}<a href="/stats/{{ top.short_id }}/">{{ top.display_title|truncatechars:28 }}</a>{% else %}—{% endif %}</div><div class="text-sm text-[var(--text-light)]">Top QR{% if top %} · {{ top.scan_count }} scans{% endif %}</div></div>
+</div>
+</section>
+
+<section class="bg-white border border-[var(--border-color)] rounded-xl shadow-sm p-5 mb-4" aria-label="Activité des 30 derniers jours">
+<div class="flex flex-wrap items-baseline gap-x-4 gap-y-1 mb-2">
+<h2 class="text-lg font-bold m-0">Activité · 30 derniers jours</h2>
+<p class="m-0 text-sm"><span class="font-bold text-[var(--primary-color)]">{{ curve_total }} scans</span>
+{% if curve_delta is not None %}<span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold {% if curve_delta >= 0 %}bg-[#e8f7ee] text-[#1c7a3d]{% else %}bg-[#fdecec] text-[#b91c1c]{% endif %}">{% if curve_delta >= 0 %}+{% endif %}{{ curve_delta }} % vs 30 j précédents</span>
+{% else %}<span class="text-sm text-[var(--text-light)]">période précédente : {{ curve_prev }} (référence vide)</span>{% endif %}</p>
+</div>
+<div class="relative h-56"><canvas id="globalCurve" aria-label="Courbe des scans par jour"></canvas></div>
+<p class="text-sm text-[var(--text-light)] chart-fallback" hidden>Graphique indisponible hors ligne — voir le tableau ci-dessous.</p>
+<details class="mt-2 text-sm"><summary class="cursor-pointer text-[var(--primary-color)]">Voir le tableau des 30 jours</summary>
+<table class="w-full border-collapse mt-2"><thead><tr><th scope="col" class="text-left py-1.5 border-b border-[var(--border-color)]">Jour</th><th scope="col" class="text-right py-1.5 border-b border-[var(--border-color)]">Scans</th></tr></thead>
+<tbody>{% for day, value in curve_rows %}<tr><td class="py-1 border-b border-[var(--border-color)]">{{ day }}</td><td class="py-1 border-b border-[var(--border-color)] text-right tabular-nums">{{ value }}</td></tr>{% endfor %}</tbody></table>
+</details>
+{{ curve_labels|json_script:"curve-labels" }}
+{{ curve_values|json_script:"curve-values" }}
+</section>
+
+<div class="grid gap-4 lg:grid-cols-2 mb-4">
+<section class="bg-white border border-[var(--border-color)] rounded-xl shadow-sm p-5" aria-label="Rythme hebdomadaire">
+<h2 class="text-lg font-bold m-0 mb-1">Rythme hebdomadaire <span class="text-sm font-normal text-[var(--text-light)]">(90 jours, heures locales)</span></h2>
+<div class="mt-2" role="img" aria-label="Matrice des scans par jour et heure">
+<div class="grid text-[11px] text-[var(--text-light)] mb-1" style="grid-template-columns:2.2rem repeat(24,minmax(0,1fr))"><span></span><span class="text-center">0h</span><span></span><span></span><span></span><span></span><span></span><span class="text-center">6h</span><span></span><span></span><span></span><span></span><span></span><span class="text-center">12h</span><span></span><span></span><span></span><span></span><span></span><span class="text-center">18h</span><span></span><span></span><span></span><span></span><span></span></div>
+{% for line in heatmap %}
+<div class="grid items-center gap-[2px] mb-[2px]" style="grid-template-columns:2.2rem repeat(24,minmax(0,1fr))">
+<span class="text-[11px] text-[var(--text-light)]">{% cycle "Lun" "Mar" "Mer" "Jeu" "Ven" "Sam" "Dim" %}</span>
+{% for v in line %}<span class="h-4 rounded-[3px]" style="background:rgba(44,95,141,{% widthratio v heat_peak 100 %}%)" title="{{ v }} scans"></span>{% endfor %}
+</div>
+{% endfor %}
+</div>
+</section>
+<section class="bg-white border border-[var(--border-color)] rounded-xl shadow-sm p-5" aria-label="Top 5 des QR">
+<h2 class="text-lg font-bold m-0 mb-2">Top 5</h2>
+{% if top5 %}
+<ol class="m-0 p-0 list-none">
+{% for row in top5 %}
+<li class="py-1.5 border-b border-[var(--border-color)] last:border-0">
+<div class="flex justify-between gap-2 text-sm"><a href="/stats/{{ row.short_id }}/">{{ row.title|default:row.target_url|truncatechars:40 }}</a><span class="tabular-nums font-semibold">{{ row.scan_count }} · {{ row.share }} %</span></div>
+<div class="h-1.5 rounded bg-[#eef2f6] mt-1"><div class="h-1.5 rounded bg-[var(--accent-color)]" style="width:{{ row.share }}%"></div></div>
+</li>
+{% endfor %}
+</ol>
+{% else %}
+<p class="text-sm text-[var(--text-light)]">Aucun QR pour le moment.</p>
+{% endif %}
+</section>
+</div>
+
+<section class="bg-white border border-[var(--border-color)] rounded-xl shadow-sm p-5 mb-4" aria-label="Scans par catégorie">
+<h2 class="text-lg font-bold m-0 mb-2">Par catégorie</h2>
+{% if cat_stats %}
+<ul class="m-0 p-0 list-none">
+{% for row in cat_stats %}
+<li class="py-1.5 border-b border-[var(--border-color)] last:border-0">
+<div class="flex justify-between gap-2 text-sm"><a href="/stats/?cat={{ row.name|urlencode }}">{{ row.name }}</a><span class="tabular-nums">{{ row.n }} QR · {{ row.scans }} scans</span></div>
+<div class="h-1.5 rounded bg-[#eef2f6] mt-1"><div class="h-1.5 rounded bg-[var(--primary-color)]" style="width:{% widthratio row.scans cat_peak 100 %}%"></div></div>
+</li>
+{% endfor %}
+</ul>
+{% else %}
+<p class="text-sm text-[var(--text-light)]">Aucune catégorie pour l'instant.</p>
+{% endif %}
+</section>
+
+<form class="bg-white border border-[var(--border-color)] rounded-xl shadow-sm p-4 mb-4 flex flex-wrap gap-2 items-center" method="get" action="/stats/" role="search">
+{% if cat %}<input type="hidden" name="cat" value="{{ cat }}">{% endif %}
+<label class="sr-only" for="q">Rechercher</label>
+<input type="text" id="q" name="q" value="{{ q }}" placeholder="Rechercher titre ou lien…" maxlength="120" class="flex-1 min-w-[200px] px-3 py-2 border border-gray-300 rounded-lg text-[15px]">
+<label class="sr-only" for="tri">Trier par</label>
+<select id="tri" name="tri" class="px-2 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+<option value="recent" {% if tri == "recent" %}selected{% endif %}>Récents d'abord</option>
+<option value="scans" {% if tri == "scans" %}selected{% endif %}>Plus scannés</option>
+<option value="titre" {% if tri == "titre" %}selected{% endif %}>Titre A→Z</option>
+<option value="cree" {% if tri == "cree" %}selected{% endif %}>Créés récemment</option>
+</select>
+<button class="inline-flex items-center px-4 py-2 rounded-lg bg-[var(--primary-color)] text-white font-semibold text-sm hover:bg-[var(--secondary-color)]" type="submit">Filtrer</button>
+{% if q or cat %}<a class="inline-flex items-center px-4 py-2 rounded-lg border border-[var(--border-color)] text-sm" href="/stats/">Réinitialiser</a>{% endif %}
+</form>
+
+{% if facets %}
+<p class="flex flex-wrap gap-1.5 mb-5" aria-label="Filtrer par catégorie">
+<a href="/stats/?q={{ q|urlencode }}&amp;tri={{ tri }}" class="border border-[var(--border-color)] bg-white rounded-full px-3 py-1 text-sm no-underline text-[var(--text-dark)] {% if not cat %}bg-[var(--primary-color)] text-white border-[var(--primary-color)]{% endif %}" {% if not cat %}aria-current="true"{% endif %}>Toutes</a>
+{% for f in facets %}
+<a href="/stats/?q={{ q|urlencode }}&amp;tri={{ tri }}&amp;cat={{ f.name|urlencode }}" class="border border-[var(--border-color)] bg-white rounded-full px-3 py-1 text-sm no-underline text-[var(--text-dark)] {% if cat|lower == f.name|lower %}bg-[var(--primary-color)] text-white border-[var(--primary-color)]{% endif %}" {% if cat|lower == f.name|lower %}aria-current="true"{% endif %}>{{ f.name }} ({{ f.n }})</a>
+{% endfor %}
+<a href="/stats/?q={{ q|urlencode }}&amp;tri={{ tri }}&amp;cat=aucune" class="border border-[var(--border-color)] bg-white rounded-full px-3 py-1 text-sm no-underline text-[var(--text-dark)] {% if cat == "aucune" %}bg-[var(--primary-color)] text-white border-[var(--primary-color)]{% endif %}" {% if cat == "aucune" %}aria-current="true"{% endif %}>Sans catégorie</a>
+</p>
+{% endif %}
+
+<p class="sr-only" role="status" aria-live="polite" id="copyStatus"></p>
+{% if links %}
+<p class="my-3 text-sm text-[var(--text-light)]" role="status">{{ links|length }} QR affiché{{ links|pluralize }}</p>
+<div class="grid gap-4 md:grid-cols-2">
+{% for link in links %}
+<article class="bg-white border border-[var(--border-color)] rounded-xl shadow-sm p-4 grid grid-cols-[128px_1fr] gap-4 max-sm:grid-cols-[96px_1fr] hover:shadow-md transition-shadow">
+<img src="/qr/{{ link.short_id }}/img/" alt="QR code vers {{ link.display_title }}" width="128" height="128" loading="lazy" class="w-32 h-32 max-sm:w-24 max-sm:h-24 border border-gray-100 rounded-[10px] bg-white">
+<div class="min-w-0">
+<h2 class="text-[17px] m-0 mb-1 break-words"><a class="text-[var(--text-dark)] no-underline hover:text-[var(--primary-color)] hover:underline" href="/stats/{{ link.short_id }}/">{{ link.display_title }}</a></h2>
+<div class="flex flex-wrap gap-1.5 items-center my-1"><span class="inline-flex items-center bg-[#e6f2ff] text-[var(--primary-color)] rounded-full px-2.5 py-0.5 font-semibold text-[13px]">{{ link.scan_count }} scan{{ link.scan_count|pluralize }}</span>
+{% if link.category %}<span class="inline-flex items-center border rounded-full px-2.5 py-0.5 text-xs font-semibold" style="{{ link.category.name|cat_style }}">{{ link.category.name }}</span>{% endif %}
+{% if link.scans_7j %}<span class="inline-flex items-center bg-[#e8f7ee] text-[#1c7a3d] rounded-full px-2.5 py-0.5 text-xs font-semibold">+{{ link.scans_7j }} (7 j)</span>{% endif %}</div>
+<div class="flex items-end gap-[2px] h-7 my-1" role="img" aria-label="Scans des 14 derniers jours">{% for v in link.spark %}<i class="flex-1 min-w-[3px] rounded-t-sm {% if v == 0 %}bg-[#dbe4ec]{% else %}bg-[var(--accent-color)] opacity-85{% endif %}" style="height:{% widthratio v link.spark_max 100 %}%" title="{{ v }} scans"></i>{% endfor %}</div>
+<p class="text-[13px] text-[var(--text-light)] my-0.5">{{ link.get_kind_display }} · dernier scan {% if link.last_scanned_at %}il y a {{ link.last_scanned_at|timesince }}{% else %}—{% endif %}</p>
+<p class="text-sm my-0.5 break-all"><a href="{{ link.display_content }}">{{ link.display_content|truncatechars:56 }}</a></p>
+<div class="mt-2 flex flex-wrap gap-1.5 text-[13px]">
+<a class="inline-flex items-center border border-[var(--border-color)] rounded-lg px-2.5 py-1" href="/stats/{{ link.short_id }}/">Fiche détaillée</a>
+<a class="inline-flex items-center border border-[var(--border-color)] rounded-lg px-2.5 py-1" href="/qr/{{ link.short_id }}/img/" download="qr-{{ link.short_id }}.png">Télécharger</a>
+<button type="button" class="inline-flex items-center border border-[var(--border-color)] rounded-lg px-2.5 py-1 bg-white cursor-pointer" data-copy="/r/{{ link.short_id }}/">Copier le court</button>
+</div>
+</div>
+</article>
+{% endfor %}
+</div>
+{% else %}
+<div class="bg-white border border-[var(--border-color)] rounded-xl shadow-sm p-10 text-center text-[var(--text-light)]">
+{% if q or cat %}<h2 class="text-[var(--text-dark)] mt-0 mb-2">Aucun résultat</h2><p>Aucun QR ne correspond à ces critères.</p><p><a class="inline-flex items-center px-4 py-2 rounded-lg bg-[var(--primary-color)] text-white font-semibold text-sm mt-4" href="/stats/">Voir tous les QR</a></p>
+{% else %}<h2 class="text-[var(--text-dark)] mt-0 mb-2">Aucun QR suivi pour l'instant</h2><p>Créez votre premier lien suivi depuis le générateur.</p><p><a class="inline-flex items-center px-4 py-2 rounded-lg bg-[var(--primary-color)] text-white font-semibold text-sm mt-4" href="/">Ouvrir le générateur</a></p>{% endif %}
+</div>
+{% endif %}
+{% endblock %}
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" defer></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var canvas = document.getElementById('globalCurve');
+  if (!canvas) return;
+  if (typeof window.Chart === 'undefined') {
+    document.querySelectorAll('.chart-fallback').forEach(function (p) { p.hidden = false; });
+    return;
+  }
+  var labels = JSON.parse(document.getElementById('curve-labels').textContent);
+  var values = JSON.parse(document.getElementById('curve-values').textContent);
+  new window.Chart(canvas, {
+    type: 'line',
+    data: { labels: labels, datasets: [{ label: 'Scans', data: values, borderColor: '#2c5f8d', backgroundColor: 'rgba(107,155,209,.25)', fill: true, tension: .3, pointRadius: 2 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+  });
+});
+document.querySelectorAll('[data-copy]').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    var done = function (ok) {
+      var s = document.getElementById('copyStatus');
+      if (s) s.textContent = ok === false ? 'Copie impossible.' : 'Copié !';
+    };
+    var val = btn.getAttribute('data-copy');
+    if (navigator.clipboard) navigator.clipboard.writeText(val).then(function(){done(true);}, function(){done(false);});
+    else {
+      var ta = document.createElement('textarea');
+      ta.value = val;
+      document.body.appendChild(ta); ta.select();
+      try { done(document.execCommand('copy')); } catch (e) { done(false); }
+      document.body.removeChild(ta);
+    }
+  });
+});
+</script>
+{% endblock %}

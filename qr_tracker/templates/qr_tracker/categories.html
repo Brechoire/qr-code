@@ -1,0 +1,85 @@
+{% extends "qr_tracker/base.html" %}
+{% block title %}Catégories — Stats QR{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold my-4">Catégories</h1>
+<section class="bg-white border border-[var(--border-color)] rounded-xl shadow-sm p-5 mb-4" aria-label="Créer une catégorie">
+<form id="createForm" class="flex gap-2 items-center flex-wrap">
+<label class="sr-only" for="newName">Nouvelle catégorie</label>
+<input type="text" id="newName" maxlength="60" placeholder="Nouvelle catégorie…" autocomplete="off" class="flex-1 min-w-[200px] px-3 py-2 border border-gray-300 rounded-lg text-[15px]">
+<button class="inline-flex items-center px-4 py-2 rounded-lg bg-[var(--primary-color)] text-white font-semibold text-sm hover:bg-[var(--secondary-color)]" type="submit">Créer</button>
+<span id="createStatus" role="status" aria-live="polite" class="text-sm text-[var(--text-light)]"></span>
+</form>
+</section>
+<section class="bg-white border border-[var(--border-color)] rounded-xl shadow-sm p-5" aria-label="Liste des catégories">
+<table class="w-full border-collapse">
+<thead><tr><th scope="col" class="text-left py-2 border-b border-[var(--border-color)]">Nom</th><th scope="col" class="text-right py-2 border-b border-[var(--border-color)]">QR</th><th scope="col" class="text-left py-2 border-b border-[var(--border-color)]">Actions</th></tr></thead>
+<tbody id="rows"></tbody>
+</table>
+<p class="text-sm text-[var(--text-light)]" id="empty" hidden>Aucune catégorie. Créez-en une ci-dessus, ou tapez un nom dans le générateur.</p>
+<p class="text-sm text-[var(--text-light)] mt-3">Supprimer une catégorie conserve ses QR (repasse en « Sans catégorie »).</p>
+</section>
+{% endblock %}
+{% block extra_js %}
+<script>
+(function () {
+  var rows = document.getElementById('rows');
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function load() {
+    fetch('/api/categories/').then(function (r) { return r.json(); }).then(function (cats) {
+      rows.innerHTML = '';
+      document.getElementById('empty').hidden = cats.length > 0;
+      var max = Math.max.apply(null, [1].concat(cats.map(function (c) { return c.links_count; })));
+      cats.forEach(function (c) {
+        var tr = document.createElement('tr');
+        var pct = Math.round((c.links_count / max) * 100);
+        tr.innerHTML = '<td class="py-2 border-b border-[var(--border-color)]"><a href="/stats/?cat=' + encodeURIComponent(c.name) + '">' + esc(c.name) + '</a>' +
+          '<div class="h-2 rounded bg-[var(--accent-color)] mt-1" style="width:' + pct + '%" aria-hidden="true"></div></td>' +
+          '<td class="py-2 border-b border-[var(--border-color)] text-right tabular-nums">' + c.links_count + '</td><td class="py-2 border-b border-[var(--border-color)]"></td>';
+        var td = tr.lastChild;
+        var ren = document.createElement('button');
+        ren.className = 'inline-flex items-center border border-[var(--border-color)] rounded-lg px-3 py-1.5 text-sm bg-white cursor-pointer';
+        ren.textContent = 'Renommer';
+        ren.setAttribute('aria-label', 'Renommer ' + c.name);
+        ren.addEventListener('click', function () {
+          var next = prompt('Nouveau nom :', c.name);
+          if (next === null) return;
+          fetch('/api/categories/' + c.id + '/', {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: next })
+          }).then(function (r) { return r.json().then(function (b) { return { ok: r.ok, b: b }; }); }).then(function (res) {
+            if (res.ok) load();
+            else alert(res.b.error || 'Erreur.');
+          });
+        });
+        var del = document.createElement('button');
+        del.className = 'inline-flex items-center border border-[var(--border-color)] rounded-lg px-3 py-1.5 text-sm bg-white cursor-pointer text-red-700';
+        del.textContent = 'Supprimer';
+        del.setAttribute('aria-label', 'Supprimer ' + c.name);
+        del.addEventListener('click', function () {
+          if (!confirm('Supprimer « ' + c.name + ' » ? Ses QR passeront en « Sans catégorie ».')) return;
+          fetch('/api/categories/' + c.id + '/', { method: 'DELETE' }).then(function () { load(); });
+        });
+        var wrap = document.createElement('div');
+        wrap.className = 'flex gap-1.5';
+        wrap.appendChild(ren); wrap.appendChild(del);
+        td.appendChild(wrap);
+        rows.appendChild(tr);
+      });
+    });
+  }
+  document.getElementById('createForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var input = document.getElementById('newName');
+    var st = document.getElementById('createStatus');
+    fetch('/api/categories/', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: input.value })
+    }).then(function (r) { return r.json().then(function (b) { return { ok: r.ok, b: b }; }); }).then(function (res) {
+      if (res.ok) { input.value = ''; st.textContent = res.b.reused ? 'Existait déjà.' : 'Créée.'; load(); }
+      else st.textContent = res.b.error || 'Erreur.';
+    }).catch(function () { st.textContent = 'Serveur injoignable.'; });
+  });
+  load();
+})();
+</script>
+{% endblock %}
